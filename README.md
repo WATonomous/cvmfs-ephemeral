@@ -1,3 +1,16 @@
+# cvmfs-ephemeral
+
+A CVMFS server meant fo storing ephemeral data. The main features are:
+- Stateless (except for the keys in `/etc/cvmfs/keys`)
+- Integrated notification system ([via cvmfs-gateway](https://cvmfs.readthedocs.io/en/stable/cpt-notification-system.html)) for clients to subscribe to changes in addition to the standard TTL-based polling
+
+These features make it suitable for storing short-lived artifacts in CI/CD pipelines.
+
+Coming soon:
+- [ ] File upload API
+- [ ] Garbage collection
+- [ ] Better documentation
+
 ### Manual Testing
 
 Server:
@@ -71,3 +84,11 @@ It's definitely a bug, because in the test suite, the retry limit appears to be 
 
 Also, the supervisor appears to be made for one-off tasks, not long-running tasks like the subscriber:
 - https://github.com/cvmfs/cvmfs/blob/669309e4bb84894acfb23c316ab6b7a07c4a34bc/cvmfs/supervisor.cc#L28
+
+References:
+- [Creating a Repository (Stratum 0)](https://cvmfs.readthedocs.io/en/stable/cpt-repo.html)
+- [Stratum 0 and client tutorial](https://cvmfs-contrib.github.io/cvmfs-tutorial-2021/02_stratum0_client/)
+- [Server Spool Area of a Repository (Stratum0)](https://cvmfs.readthedocs.io/en/stable/apx-serverinfra.html#server-spool-area-of-a-repository-stratum0)
+- [The CernVM-FS Notification System (Experimental)](https://cvmfs.readthedocs.io/en/stable/cpt-notification-system.html)
+- [TOWARDS A RESPONSIVE CVMFS ARCHITECTURE](https://indico.cern.ch/event/587955/contributions/2937405/attachments/1682388/2703315/radu_popescu_chep_2018.pdf)
+- [Towards a Serverless CernVM-FS](https://indico.cern.ch/event/587955/contributions/3012720/attachments/1685212/2711599/cvmfs-chep18.pdf)
