@@ -7,7 +7,7 @@ A CVMFS stratum 0 server meant fo storing ephemeral data. The main features are:
 These features make it suitable for storing short-lived artifacts in CI/CD pipelines.
 
 Coming soon:
-- [ ] File upload API
+- [ ] File upload API (we may be able to simply use the [publisher](https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#publisher-configuration). It has nice features like being able to handle concurrent transactions.)
 - [ ] Garbage collection
 - [ ] Better documentation
 
