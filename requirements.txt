@@ -1,0 +1,2 @@
+watcloud-utils @ git+https://github.com/WATonomous/watcloud-utils.git@c8ce1006716e65971f750560f90f442721b3777d
+python-slugify>=8.0.4,<9

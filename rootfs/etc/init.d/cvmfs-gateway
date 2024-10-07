@@ -1,0 +1,81 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          cvmfs_gateway
+# Required-Start:    $syslog $network
+# Required-Stop:     $syslog $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: CernVM-FS Repository Gateway
+# Description:       Starts/stops the CernVM-FS Repository Gateway daemon.
+### END INIT INFO
+
+# References:
+# - https://chatgpt.com/share/67044ff7-25e8-8010-9c0a-f7ed3d826d95
+# - https://stackoverflow.com/a/21029952
+# - https://github.com/cvmfs/cvmfs/blob/669309e4bb84894acfb23c316ab6b7a07c4a34bc/packaging/debian/cvmfs/cvmfs-gateway.install
+
+DAEMON=/usr/bin/cvmfs_gateway
+RECEIVER=/usr/bin/cvmfs_receiver
+NAME=cvmfs_gateway
+PIDFILE=/var/run/$NAME.pid
+LOGFILE=/var/log/$NAME.log
+
+. /lib/lsb/init-functions
+
+start() {
+    log_daemon_msg "Starting $NAME"
+
+    # check if already running
+    if [ -s $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null;
+    then
+        log_daemon_msg "apparently already running"
+        log_end_msg 0
+        return 0
+    fi
+
+    if start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE --startas /bin/bash -- -c "exec $DAEMON > $LOGFILE 2>&1";
+    then
+        log_end_msg 0
+    else
+        log_end_msg 1
+    fi
+}
+
+stop() {
+    log_daemon_msg "Stopping $NAME"
+    if start-stop-daemon --stop --quiet --pidfile $PIDFILE;
+    then
+        log_end_msg 0
+        log_daemon_msg "Stopping cvmfs_receiver"
+        killall cvmfs_receiver
+    else
+        log_end_msg 1
+    fi
+}
+
+restart() {
+    stop
+    sleep 5
+    start
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|force-reload)
+        restart
+        ;;
+    status)
+        status_of_proc -p $PIDFILE $DAEMON $NAME && exit 0 || exit $?
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|force-reload|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

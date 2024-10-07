@@ -1,0 +1,28 @@
+services:
+  cvmfs-server:
+    build:
+      context: .
+    
+    ports:
+      - "8080:80"
+      - "4929:4929"
+    
+    volumes:
+      - ./src:/app
+      # Persist the keys so that the client doesn't need to be reconfigured
+      - ./tmp/cvmfs-keys:/etc/cvmfs/keys/
+    
+    tmpfs:
+      # use ephemeral data directory for testing
+      - /srv
+      # Required (placing /var/spool/cvmfs in both tmpfs and bind mount both work. Make sure to clean this up if using bind mount). Otherwise will get the following error:
+      #   Mounting CernVM-FS Storage... (overlayfs) mount: /cvmfs/cvmfs.cluster.watonomous.ca: wrong fs type, bad option, bad superblock on overlay_cvmfs.cluster.watonomous.ca, missing codepage or helper program, or other error.
+      # https://cernvm-forum.cern.ch/t/overlayfs-on-top-of-cephfs/120/4
+      - /var/spool/cvmfs
+    
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    devices:
+      - /dev/fuse
