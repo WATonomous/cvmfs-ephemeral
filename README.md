@@ -1,6 +1,6 @@
 # cvmfs-ephemeral
 
-A CVMFS server meant fo storing ephemeral data. The main features are:
+A CVMFS stratum 0 server meant fo storing ephemeral data. The main features are:
 - Stateless (except for the keys in `/etc/cvmfs/keys`)
 - Integrated notification system ([via cvmfs-gateway](https://cvmfs.readthedocs.io/en/stable/cpt-notification-system.html)) for clients to subscribe to changes in addition to the standard TTL-based polling
 
