@@ -10,7 +10,7 @@ Coming soon:
 - [ ] File upload API (we may be able to simply use the [publisher](https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#publisher-configuration). It has nice features like being able to handle concurrent transactions.)
 - [ ] Garbage collection
 - [ ] Better documentation
-- [ ] Automatic key re-signing
+- [ ] Automatic [whitelist re-signing](https://cvmfs.readthedocs.io/en/stable/apx-security.html#signature-details)
 
 ### Manual Testing
 
