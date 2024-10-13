@@ -14,7 +14,7 @@ Coming soon:
 
 ### Manual Testing
 
-Server:
+#### Server
 
 ```
 docker compose run --service-ports cvmfs-server
@@ -22,7 +22,7 @@ docker compose run --service-ports cvmfs-server
 python3 main.py init-cvmfs-repo cvmfs-server.example.local
 ```
 
-Client:
+#### Client
 
 ```bash
 docker run --rm -it \
@@ -53,6 +53,26 @@ docker exec -it cvmfs sh -c "while true; do date; ls -alh /cvmfs/cvmfs-server.ex
 
 docker exec -it cvmfs tail -f /var/log/cvmfs.log
 ```
+
+#### Publisher
+
+The [publisher](https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#publisher-configuration) can be used to publish new data to the CVMFS server.
+
+```bash
+docker run -it --rm --cap-add SYS_ADMIN --device /dev/fuse -v $(pwd)/tmp/cvmfs-keys:/tmp/imported-keys:ro --tmpfs /var/spool/cvmfs cvmfs-ephemeral-cvmfs-server
+```
+
+The arguments `--tmpfs /var/spool/cvmfs` is used to avoid the following error. Bind mounting this also works.
+> Mounting CernVM-FS Storage... (overlayfs) mount: /cvmfs/cvmfs.cluster.watonomous.ca: wrong fs type, bad option, bad superblock on overlay_cvmfs.cluster.watonomous.ca, missing codepage or helper program, or other error.
+
+```bash
+cvmfs_server mkfs -w http://thor-slurm1.cluster.watonomous.ca:8080/cvmfs/cvmfs-server.example.local \
+    -u gw,/srv/cvmfs/cvmfs-server.example.local/data/txn,http://thor-slurm1.cluster.watonomous.ca:4929/api/v1 \
+    -k /tmp/imported-keys/ -o $(whoami) cvmfs-server.example.local
+```
+
+Then perform `cvmfs_server transaction` like normal.
+
 
 ### Notifications
 
