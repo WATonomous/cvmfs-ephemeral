@@ -81,7 +81,7 @@ def start_server():
 fastapi_app = WATcloudFastAPI(logger=logger)
 transaction_lock = Lock()
 
-@fastapi_app.post("/upload/{repo_name}")
+@fastapi_app.post("/repos/{repo_name}/upload")
 async def upload(repo_name: str, file: UploadFile, overwrite: bool = False):
     logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type})")
 
@@ -125,7 +125,7 @@ async def upload(repo_name: str, file: UploadFile, overwrite: bool = False):
 
     return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": upload_end - upload_start, "publish_time_s": publish_end - publish_start}
 
-@fastapi_app.get("/download/{repo_name}/{file_name}")
+@fastapi_app.get("/repos/{repo_name}/{file_name}")
 async def download(repo_name: str, file_name: str):
     logger.info(f"Downloading file: {file_name} from repo: {repo_name}")
 
@@ -135,7 +135,7 @@ async def download(repo_name: str, file_name: str):
 
     return FileResponse(file_path)
 
-@fastapi_app.get("/list/{repo_name}")
+@fastapi_app.get("/repos/{repo_name}")
 async def list_files(repo_name: str):
     logger.info(f"Listing files in repo: {repo_name}")
 
@@ -144,6 +144,34 @@ async def list_files(repo_name: str):
         raise HTTPException(status_code=404, detail=f"Repo {repo_name} does not exist")
 
     return {"files": [file.name for file in repo_path.iterdir() if file.is_file()]}
+
+@fastapi_app.delete("/repos/{repo_name}/{file_name}")
+async def delete_file(repo_name: str, file_name: str):
+    logger.info(f"Deleting file: {file_name} from repo: {repo_name}")
+
+    file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {file_name} does not exist in repo {repo_name}")
+
+    with transaction_lock:
+        # start transaction
+        subprocess.run(["cvmfs_server", "transaction", repo_name], check=True)
+
+        try:
+            # Remove file
+            file_path.unlink()
+            logger.info(f"Deleted file: {file_name} from repo: {repo_name}")
+        except Exception as e:
+            logger.error(f"Failed to delete file: {file_name} from repo: {repo_name}")
+            logger.exception(e)
+            # abort transaction
+            subprocess.run(["cvmfs_server", "abort", repo_name, "-f"], check=True)
+            raise HTTPException(status_code=500, detail="Failed to delete file")
+
+        # publish transaction
+        subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
+
+    return {"filename": file_name}
 
 @app.command()
 def start_server(port: int = 81):
