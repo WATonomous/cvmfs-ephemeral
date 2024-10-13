@@ -32,10 +32,14 @@ RUN cd /tmp \
     && dpkg -i cvmfs-release_4.3-1_all.deb \
     && rm cvmfs-release_4.3-1_all.deb
 
-# Install CVMFS
-RUN apt-get update && apt-get install -y \
+# Install CVMFS and support tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
     cvmfs \
     cvmfs-server \
+    # For hosting the cvmfs repository
+    apache2 \
+    # Provides the modprobe command, required by /usr/bin/cvmfs_server
+    kmod \
     && rm -rf /var/lib/apt/lists/* 
 
 # MARK: publisher
