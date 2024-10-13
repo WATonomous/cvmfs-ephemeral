@@ -3,11 +3,17 @@ import random
 import string
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+import uvicorn
+from fastapi import UploadFile
 from slugify import slugify
+from watcloud_utils.fastapi import WATcloudFastAPI
+from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
 
+set_up_logging()
 
 @app.command()
 def init_cvmfs_repo(repo_name: str):
@@ -69,6 +75,25 @@ def start_server():
     print("Starting server")
     while True:
         pass
+
+fastapi_app = WATcloudFastAPI(logger=logger)
+
+
+@fastapi_app.post("/upload")
+async def upload_file(file: UploadFile):
+    # Time the file upload
+    start_time = time.perf_counter()
+    await file.read()
+    end_time = time.perf_counter()
+
+    logger.info(f"Uploaded file: {file.filename} (content_type: {file.content_type}) took {end_time - start_time:.2f}s")
+
+    return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": end_time - start_time}
+
+
+@app.command()
+def start_server(port: int = 81):
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
