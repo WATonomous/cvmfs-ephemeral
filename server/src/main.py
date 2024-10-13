@@ -33,9 +33,12 @@ def init_cvmfs_repo(repo_name: str):
     if res.returncode != 0:
         sys.exit(f"Failed to run cvmfs_server mkfs (exit code: {res.returncode})")
 
-    # Make the public key available for clients
+    # Make the public key and certificate available via HTTP
+    # Useful for clients and publishers:
+    # https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#example-procedure
     Path("/var/www/html/cvmfs-meta").mkdir(parents=True, exist_ok=True)
     Path(f"/var/www/html/cvmfs-meta/{repo_name}.pub").symlink_to(f"/etc/cvmfs/keys/{repo_name}.pub")
+    Path(f"/var/www/html/cvmfs-meta/{repo_name}.crt").symlink_to(f"/etc/cvmfs/keys/{repo_name}.crt")
 
     # Configure cvmfs-gateway
     gateway_key_path = Path(f"/etc/cvmfs/keys/{repo_name}.gw")
