@@ -19,17 +19,17 @@ def init_cvmfs_repo(repo_name: str):
         Path("/var/www/cvmfs").symlink_to("/srv/cvmfs")
 
     # Enable apache2 modules
-    res = subprocess.run(["a2enmod", "headers", "expires", "proxy", "proxy_http"])
+    res = subprocess.run(["a2enmod", "headers", "expires", "proxy", "proxy_http"], check=True)
     if res.returncode != 0:
         sys.exit(f"Failed to enable apache2 modules (exit code: {res.returncode})")
 
     # Start apache2 service
-    res = subprocess.run(["service", "apache2", "start"])
+    res = subprocess.run(["service", "apache2", "start"], check=True)
     if res.returncode != 0:
         sys.exit(f"Failed to start apache2 service (exit code: {res.returncode})")
 
     # Run cvmfs_server mkfs
-    res = subprocess.run(["cvmfs_server", "mkfs", "-o", "root", "-Z", "none", repo_name])
+    res = subprocess.run(["cvmfs_server", "mkfs", "-o", "root", "-Z", "none", repo_name], check=True)
     if res.returncode != 0:
         sys.exit(f"Failed to run cvmfs_server mkfs (exit code: {res.returncode})")
 
@@ -54,7 +54,7 @@ def init_cvmfs_repo(repo_name: str):
     gateway_repo_config_path.write_text(json.dumps(gateway_repo_config, indent=4))
 
     # Restart cvmfs-gateway
-    res = subprocess.run(["service", "cvmfs-gateway", "restart"])
+    res = subprocess.run(["service", "cvmfs-gateway", "restart"], check=True)
     if res.returncode != 0:
         sys.exit(f"Failed to restart cvmfs-gateway service (exit code: {res.returncode})")
 
