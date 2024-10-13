@@ -5,14 +5,15 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from threading import Lock
 
 import uvicorn
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from slugify import slugify
 from watcloud_utils.fastapi import WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
-from threading import Lock
 
 set_up_logging()
 
@@ -81,7 +82,7 @@ fastapi_app = WATcloudFastAPI(logger=logger)
 transaction_lock = Lock()
 
 @fastapi_app.post("/upload/{repo_name}")
-async def upload_file(repo_name: str, file: UploadFile, overwrite: bool = False):
+async def upload(repo_name: str, file: UploadFile, overwrite: bool = False):
     logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type})")
 
     # check if repo exists
@@ -124,6 +125,25 @@ async def upload_file(repo_name: str, file: UploadFile, overwrite: bool = False)
 
     return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": upload_end - upload_start, "publish_time_s": publish_end - publish_start}
 
+@fastapi_app.get("/download/{repo_name}/{file_name}")
+async def download(repo_name: str, file_name: str):
+    logger.info(f"Downloading file: {file_name} from repo: {repo_name}")
+
+    file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {file_name} does not exist in repo {repo_name}")
+
+    return FileResponse(file_path)
+
+@fastapi_app.get("/list/{repo_name}")
+async def list_files(repo_name: str):
+    logger.info(f"Listing files in repo: {repo_name}")
+
+    repo_path = Path(f"/cvmfs/{repo_name}")
+    if not repo_path.exists():
+        raise HTTPException(status_code=404, detail=f"Repo {repo_name} does not exist")
+
+    return {"files": [file.name for file in repo_path.iterdir() if file.is_file()]}
 
 @app.command()
 def start_server(port: int = 81):
