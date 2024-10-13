@@ -59,7 +59,7 @@ docker exec -it cvmfs tail -f /var/log/cvmfs.log
 The [publisher](https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#publisher-configuration) can be used to publish new data to the CVMFS server.
 
 ```bash
-docker run -it --rm --cap-add SYS_ADMIN --device /dev/fuse -v $(pwd)/tmp/cvmfs-keys:/tmp/imported-keys:ro --tmpfs /var/spool/cvmfs cvmfs-ephemeral-cvmfs-server
+docker-compose run cvmfs-publisher
 ```
 
 The arguments `--tmpfs /var/spool/cvmfs` is used to avoid the following error. Bind mounting this also works.
@@ -71,7 +71,16 @@ cvmfs_server mkfs -w http://thor-slurm1.cluster.watonomous.ca:8080/cvmfs/cvmfs-s
     -k /tmp/imported-keys/ -o $(whoami) cvmfs-server.example.local
 ```
 
-Then perform `cvmfs_server transaction` like normal.
+Then perform `cvmfs_server transaction` like normal:
+
+```bash
+cvmfs_server transaction
+echo "Hello, World! $(date)" > /cvmfs/cvmfs-server.example.local/hello-$(date +%s).txt
+cvmfs_server publish
+
+# optional: notify clients
+cvmfs_swissknife notify -p -u http://thor-slurm1.cluster.watonomous.ca:4929/api/v1 -r http://thor-slurm1.cluster.watonomous.ca:8080/cvmfs/cvmfs-server.example.local
+```
 
 
 ### Notifications

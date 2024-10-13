@@ -2,13 +2,14 @@ services:
   cvmfs-server:
     build:
       context: .
+      target: server
     
     ports:
       - "8080:80"
       - "4929:4929"
     
     volumes:
-      - ./src:/app
+      - ./server/src:/app
       # Persist the keys so that the client doesn't need to be reconfigured
       - ./tmp/cvmfs-keys:/etc/cvmfs/keys/
     
@@ -20,6 +21,24 @@ services:
       # https://cernvm-forum.cern.ch/t/overlayfs-on-top-of-cephfs/120/4
       - /var/spool/cvmfs
     
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    devices:
+      - /dev/fuse
+  
+  cvmfs-publisher:
+    build:
+      context: .
+      target: publisher
+
+    volumes:
+      - ./tmp/cvmfs-keys:/tmp/imported-keys:ro
+    
+    tmpfs:
+      - /var/spool/cvmfs
+
     cap_add:
       - SYS_ADMIN
     security_opt:
