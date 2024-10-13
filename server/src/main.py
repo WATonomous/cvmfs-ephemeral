@@ -7,16 +7,15 @@ import time
 from pathlib import Path
 from threading import Lock
 
+import typer
 import uvicorn
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from slugify import slugify
+from typing_extensions import Annotated
 from watcloud_utils.fastapi import WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
-from typing_extensions import Annotated
-import typer
-
 
 set_up_logging()
 
