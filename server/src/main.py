@@ -14,11 +14,26 @@ from slugify import slugify
 from watcloud_utils.fastapi import WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
+from typing_extensions import Annotated
+import typer
+
 
 set_up_logging()
 
 @app.command()
-def init_cvmfs_repo(repo_name: str):
+def init_cvmfs_repo(
+    repo_name: Annotated[str, typer.Argument(help="Name of the CVMFS repo. CVMFS requires this to be an FQDN.")],
+    volatile: Annotated[bool, typer.Option(help="Whether the repo is volatile or not. If True, the repo will be created (cvmfs_server mkfs) with the -v flag.")] = True,
+    enable_garbage_collection: Annotated[bool, typer.Option(help="Whether to enable garbage collection for the repo.")] = True,
+    disable_auto_tag: Annotated[bool, typer.Option(help="Whether to disable auto-tagging for the repo.")] = True,
+    compression_algorithm: Annotated[str, typer.Option(help="Compression algorithm to use for the repo.")] = "none",
+    file_mbyte_limit: Annotated[int, typer.Option(help="Maximum file size in MiB that can be uploaded to the repo.")] = 4096,
+):
+    """
+    Initialize a CVMFS repo.
+
+    Docs: https://cvmfs.readthedocs.io/en/stable/cpt-repo.html
+    """
     print(f"Initializing CVMFS repo: {repo_name}")
 
     # Make apache2 serve cvmfs repos
@@ -37,9 +52,22 @@ def init_cvmfs_repo(repo_name: str):
         sys.exit(f"Failed to start apache2 service (exit code: {res.returncode})")
 
     # Run cvmfs_server mkfs
-    res = subprocess.run(["cvmfs_server", "mkfs", "-o", "root", "-Z", "none", repo_name], check=True)
+    res = subprocess.run(
+        ["cvmfs_server", "mkfs", "-o", "root", "-Z", compression_algorithm]
+        + (["-v"] if volatile else []) 
+        + (["-z"] if enable_garbage_collection else [])
+        + (["-g"] if disable_auto_tag else [])
+        + [repo_name],
+        check=True
+    )
     if res.returncode != 0:
         sys.exit(f"Failed to run cvmfs_server mkfs (exit code: {res.returncode})")
+
+    # Populate repo configuration
+    repo_config_path = Path(f"/etc/cvmfs/repositories.d/{repo_name}/server.conf")
+    with open(repo_config_path, "a") as f:
+        f.write("\n")
+        f.write(f"CVMFS_FILE_MBYTE_LIMIT={file_mbyte_limit}\n")
 
     # Make the public key and certificate available via HTTP
     # Useful for clients and publishers:
@@ -81,7 +109,7 @@ def start_server():
 fastapi_app = WATcloudFastAPI(logger=logger)
 transaction_lock = Lock()
 
-@fastapi_app.post("/repos/{repo_name}/upload")
+@fastapi_app.post("/repos/{repo_name}")
 async def upload(repo_name: str, file: UploadFile, overwrite: bool = False):
     logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type})")
 
@@ -172,6 +200,20 @@ async def delete_file(repo_name: str, file_name: str):
         subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
 
     return {"filename": file_name}
+
+@app.command()
+@fastapi_app.post("/gc")
+def gc():
+    """
+    Perform garbage collection on all repos.
+    """
+    with transaction_lock:
+        logger.info("Running garbage collection")
+        gc_start = time.perf_counter()
+        subprocess.run(["cvmfs_server", "gc", "-r", "0", "-f"], check=True)
+        gc_end = time.perf_counter()
+        logger.info(f"Garbage collection completed. Took {gc_end - gc_start:.2f}s")
+        return {"message": "Garbage collection completed", "gc_time_s": gc_end - gc_start}
 
 @app.command()
 def start_server(port: int = 81):
