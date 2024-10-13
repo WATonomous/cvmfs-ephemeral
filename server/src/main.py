@@ -7,11 +7,12 @@ import time
 from pathlib import Path
 
 import uvicorn
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 from slugify import slugify
 from watcloud_utils.fastapi import WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
+from threading import Lock
 
 set_up_logging()
 
@@ -77,18 +78,51 @@ def start_server():
         pass
 
 fastapi_app = WATcloudFastAPI(logger=logger)
+transaction_lock = Lock()
 
+@fastapi_app.post("/upload/{repo_name}")
+async def upload_file(repo_name: str, file: UploadFile, overwrite: bool = False):
+    logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type})")
 
-@fastapi_app.post("/upload")
-async def upload_file(file: UploadFile):
-    # Time the file upload
-    start_time = time.perf_counter()
-    await file.read()
-    end_time = time.perf_counter()
+    # check if repo exists
+    if not Path(f"/cvmfs/{repo_name}").exists():
+        raise HTTPException(status_code=404, detail=f"Repo {repo_name} does not exist")
 
-    logger.info(f"Uploaded file: {file.filename} (content_type: {file.content_type}) took {end_time - start_time:.2f}s")
+    file_path = Path(f"/cvmfs/{repo_name}/{file.filename}")
+    if not overwrite and file_path.exists():
+        raise HTTPException(status_code=409, detail=f"File {file.filename} already exists")
 
-    return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": end_time - start_time}
+    with transaction_lock:
+        # start transaction
+        subprocess.run(["cvmfs_server", "transaction", repo_name], check=True)
+
+        try:
+            # Remove existing file
+            if file_path.exists():
+                file_path.unlink()
+
+            # Upload file
+            with file_path.open("wb") as f:
+                upload_start = time.perf_counter()
+                f.write(await file.read())
+                upload_end = time.perf_counter()
+
+            logger.info(f"Uploaded file: {file.filename} (content_type: {file.content_type}). Took {upload_end - upload_start:.2f}s")
+        except Exception as e:
+            logger.error(f"Failed to upload file: {file.filename} (content_type: {file.content_type})")
+            logger.exception(e)
+            # abort transaction
+            subprocess.run(["cvmfs_server", "abort", repo_name, "-f"], check=True)
+            raise HTTPException(status_code=500, detail="Failed to upload file")
+
+        # publish transaction
+        publish_start = time.perf_counter()
+        subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
+        publish_end = time.perf_counter()
+
+        logger.info(f"Published transaction for repo: {repo_name} with file: {file.filename} (content_type: {file.content_type}). Took {publish_end - publish_start:.2f}s")
+
+    return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": upload_end - upload_start, "publish_time_s": publish_end - publish_start}
 
 
 @app.command()
