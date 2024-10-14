@@ -1,2 +1,5 @@
 watcloud-utils @ git+https://github.com/WATonomous/watcloud-utils.git@c8ce1006716e65971f750560f90f442721b3777d
 python-slugify>=8.0.4,<9
+python-multipart>=0.0.12,<1
+uvicorn>=0.31.1,<1
+apscheduler>=3.10.4,<4

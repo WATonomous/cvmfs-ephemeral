@@ -5,7 +5,11 @@ services:
       target: server
     
     ports:
+      # cvmfs file server
       - "8080:80"
+      # application server
+      - "8081:81"
+      # cvmfs gateway
       - "4929:4929"
     
     volumes:
