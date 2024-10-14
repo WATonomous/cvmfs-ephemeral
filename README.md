@@ -10,7 +10,7 @@ Coming soon:
 - [x] File upload API (we may be able to simply use the [publisher](https://cvmfs.readthedocs.io/en/stable/cpt-repository-gateway.html#publisher-configuration). It has nice features like being able to handle concurrent transactions.)
     - The publisher appears to be bottlenecked at 20MiB/s when running the server in Kubernetes, and around 80MiB/s when running in Docker. `iperf` gives much higher bandwidth (between nodes and between the Kubernetes container and nodes), so it's likely not a network bottleneck.
     - When using the custom FastAPI upload server, speeds reach over 400MiB/s easily. We'll adopt this approach.
-- [ ] Garbage collection
+- [x] Garbage collection
 - [ ] Better documentation
 - [ ] Automatic [whitelist re-signing](https://cvmfs.readthedocs.io/en/stable/apx-security.html#signature-details)
 

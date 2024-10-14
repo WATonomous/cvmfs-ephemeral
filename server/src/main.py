@@ -4,16 +4,19 @@ import string
 import subprocess
 import sys
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Lock
 
 import typer
 import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from slugify import slugify
 from typing_extensions import Annotated
-from watcloud_utils.fastapi import WATcloudFastAPI
+from watcloud_utils.fastapi import WATcloudFastAPI, FastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
 
@@ -99,13 +102,22 @@ def init_cvmfs_repo(
     print(f"Successfully initialized CVMFS repo: {repo_name}")
     print(f"The public key is available via HTTP at GET /cvmfs-meta/{repo_name}.pub")
 
-@app.command()
-def start_server():
-    print("Starting server")
-    while True:
-        pass
+@asynccontextmanager
+async def fastapi_lifespan(app: FastAPI):
+    """
+    This function wraps the FastAPI app in a lifespan context manager.
+    i.e. it allows us to run code when the app starts and stops.
+    """
+    try:
+        scheduler.start()
+        # Run garbage collection every minute
+        scheduler.add_job(gc, CronTrigger.from_crontab("* * * * *"))
+        yield
+    finally:
+        scheduler.shutdown()
 
-fastapi_app = WATcloudFastAPI(logger=logger)
+scheduler = BackgroundScheduler()
+fastapi_app = WATcloudFastAPI(logger=logger, lifespan=fastapi_lifespan)
 transaction_lock = Lock()
 
 @fastapi_app.post("/repos/{repo_name}")
