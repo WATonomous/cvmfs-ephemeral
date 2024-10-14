@@ -150,6 +150,8 @@ async def upload(repo_name: str, file: UploadFile, overwrite: bool = False):
 
         logger.info(f"Published transaction for repo: {repo_name} with file: {file.filename} (content_type: {file.content_type}). Took {publish_end - publish_start:.2f}s")
 
+        notify(repo_name)
+
     return {"filename": file.filename, "content_type": file.content_type, "upload_time_s": upload_end - upload_start, "publish_time_s": publish_end - publish_start}
 
 @fastapi_app.get("/repos/{repo_name}/{file_name}")
@@ -197,6 +199,7 @@ async def delete_file(repo_name: str, file_name: str):
 
         # publish transaction
         subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
+        notify(repo_name)
 
     return {"filename": file_name}
 
@@ -213,6 +216,33 @@ def gc():
         gc_end = time.perf_counter()
         logger.info(f"Garbage collection completed. Took {gc_end - gc_start:.2f}s")
         return {"message": "Garbage collection completed", "gc_time_s": gc_end - gc_start}
+
+
+@app.command()
+@fastapi_app.post("/repos/{repo_name}/notify")
+def notify(repo_name: str):
+    """
+    Use cvmfs-gateway to notify clients about changes in the repo.
+    """
+    logger.info(f"Notifying clients about changes in repo: {repo_name}")
+    subprocess.run(
+        [
+            "cvmfs_swissknife",
+            "notify",
+            # publish
+            "-p",
+            # notification server URL
+            "-u",
+            "http://localhost:4929/api/v1",
+            # URL of the repository
+            "-r",
+            f"http://localhost/cvmfs/{repo_name}",
+        ],
+        check=True,
+    )
+
+    return {"message": f"Notified clients about changes in repo {repo_name}"}
+
 
 @app.command()
 def start_server(port: int = 81):
