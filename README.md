@@ -115,7 +115,10 @@ It's definitely a bug, because in the test suite, the retry limit appears to be 
 Also, the supervisor appears to be made for one-off tasks, not long-running tasks like the subscriber:
 - https://github.com/cvmfs/cvmfs/blob/669309e4bb84894acfb23c316ab6b7a07c4a34bc/cvmfs/supervisor.cc#L28
 
-References:
+I've created an issue here: https://github.com/cvmfs/cvmfs/issues/3678
+
+
+### References
 - [Creating a Repository (Stratum 0)](https://cvmfs.readthedocs.io/en/stable/cpt-repo.html)
 - [Stratum 0 and client tutorial](https://cvmfs-contrib.github.io/cvmfs-tutorial-2021/02_stratum0_client/)
 - [Server Spool Area of a Repository (Stratum0)](https://cvmfs.readthedocs.io/en/stable/apx-serverinfra.html#server-spool-area-of-a-repository-stratum0)
