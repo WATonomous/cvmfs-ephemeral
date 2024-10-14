@@ -225,6 +225,10 @@ def notify(repo_name: str):
     Use cvmfs-gateway to notify clients about changes in the repo.
     """
     logger.info(f"Notifying clients about changes in repo: {repo_name}")
+
+    if not Path(f"/cvmfs/{repo_name}").exists():
+        raise HTTPException(status_code=404, detail=f"Repo {repo_name} does not exist")
+
     subprocess.run(
         [
             "cvmfs_swissknife",
