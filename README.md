@@ -89,12 +89,40 @@ cvmfs_swissknife notify -p -u http://thor-slurm1.cluster.watonomous.ca:4929/api/
 ```bash
 python3 main.py init-cvmfs-repo cvmfs-server.example.local
 time cvmfs_ducc convert-single-image ghcr.io/watonomous/actions-runner-image:nightly cvmfs-server.example.local --skip-layers
+# real    1m6.331s
+# user    0m52.700s
+# sys     0m29.849s
 time cvmfs_ducc convert-single-image ghcr.io/watonomous/infra-config:master cvmfs-server.example.local --skip-layers
+# real    0m49.238s
+# user    0m36.520s
+# sys     0m25.311s
 ```
 
 This is the step that downloads image layers:
 - https://github.com/cvmfs/cvmfs/blob/5c3777cf846cd2bb6e73d17af83384b37c2b6fa2/ducc/lib/conversion.go#L134
 
+See the effects of deduplication:
+```
+root@f5a15f3a5635:/app# df -h /srv
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs            95G   56K   95G   1% /srv
+
+root@f5a15f3a5635:/app# time cvmfs_ducc convert-single-image ghcr.io/watonomous/infra-config:master cvmfs-server.example.local --skip-layers
+
+root@f5a15f3a5635:/app# df -h /srv
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs            95G  1.5G   93G   2% /srv
+
+root@f5a15f3a5635:/app# time cvmfs_ducc convert-single-image ghcr.io/watonomous/infra-config@sha256:46b00a593dc4b93972501bad7b5cb0167f687d0791fa7611764b22dd31101a46 cvmfs-server.example.local --skip-layers
+
+root@f5a15f3a5635:/app# df -h /srv
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs            95G  1.7G   93G   2% /srv
+```
+
+File deduplication is nice, but it still takes a long time to convert images.
+It appears that the conversion process is downloading/unpacking + [adding singularity metadata](https://github.com/cvmfs/cvmfs/blob/5c3777cf846cd2bb6e73d17af83384b37c2b6fa2/ducc/lib/conversion.go#L161-L172).
+If we don't use a registry in the first place, there may be no need to convert the image into layers in the first place. Perhaps we can just zip up all of the files and add the metadata.
 
 ### Notifications
 
