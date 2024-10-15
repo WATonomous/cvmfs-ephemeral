@@ -127,7 +127,7 @@ transaction_lock = Lock()
 
 @fastapi_app.post("/repos/{repo_name}")
 async def upload(repo_name: str, file: UploadFile, overwrite: bool = False, ttl_s: int = DEFAULT_TTL_S):
-    logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type})")
+    logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type}, ttl_s: {ttl_s}) to repo: {repo_name}")
 
     if file.filename in FILENAME_BLACKLIST:
         raise HTTPException(status_code=400, detail=f"Filename {file.filename} is not allowed")
@@ -313,7 +313,7 @@ def clean(repo_name: str):
 
         try:
             ttl_obj = json.loads(ttl_path.read_text())
-            for file_name, ttl in ttl_obj.items():
+            for file_name, ttl in ttl_obj.copy().items():
                 if ttl["expires_at"] < time.time():
                     file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
                     if file_path.exists():
@@ -332,7 +332,7 @@ def clean(repo_name: str):
             logger.exception(e)
             # abort transaction
             subprocess.run(["cvmfs_server", "abort", repo_name, "-f"], check=True)
-            raise HTTPException(status_code=500, detail="Failed to clean up expired files")
+            raise HTTPException(status_code=500, detail=f"Failed to clean up expired files: {e}")
 
         # publish transaction
         subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
