@@ -1,5 +1,6 @@
 import json
 import random
+import shutil
 import string
 import subprocess
 import sys
@@ -16,7 +17,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from slugify import slugify
 from typing_extensions import Annotated
-from watcloud_utils.fastapi import WATcloudFastAPI, FastAPI
+from watcloud_utils.fastapi import FastAPI, WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
 
@@ -49,6 +50,10 @@ def init_cvmfs_repo(
     """
     print(f"Initializing CVMFS repo: {repo_name}")
 
+    repo_config_path = Path(f"/etc/cvmfs/repositories.d/{repo_name}/server.conf")
+    if repo_config_path.exists():
+        sys.exit(f"Repo is already initialized: {repo_name}")
+
     # Make apache2 serve cvmfs repos
     Path("/srv/cvmfs").mkdir(parents=True, exist_ok=True)
     if not Path("/var/www/cvmfs").exists():
@@ -64,6 +69,11 @@ def init_cvmfs_repo(
     if res.returncode != 0:
         sys.exit(f"Failed to start apache2 service (exit code: {res.returncode})")
 
+    # Clean the spool directory that may be left over from previous runs.
+    # If we don't clean this, cvmfs_server mkfs will fail with error:
+    # "<repo_name> is not based on the newest published revision"
+    shutil.rmtree(f"/var/spool/cvmfs/{repo_name}", ignore_errors=True)
+
     # Run cvmfs_server mkfs
     res = subprocess.run(
         ["cvmfs_server", "mkfs", "-o", "root", "-Z", compression_algorithm]
@@ -77,7 +87,6 @@ def init_cvmfs_repo(
         sys.exit(f"Failed to run cvmfs_server mkfs (exit code: {res.returncode})")
 
     # Populate repo configuration
-    repo_config_path = Path(f"/etc/cvmfs/repositories.d/{repo_name}/server.conf")
     with open(repo_config_path, "a") as f:
         f.write("\n")
         f.write(f"CVMFS_FILE_MBYTE_LIMIT={file_mbyte_limit}\n")
