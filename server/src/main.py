@@ -30,11 +30,17 @@ FILENAME_BLACKLIST = [TTL_FILENAME]
 @app.command()
 def init_cvmfs_repo(
     repo_name: Annotated[str, typer.Argument(help="Name of the CVMFS repo. CVMFS requires this to be an FQDN.")],
-    volatile: Annotated[bool, typer.Option(help="Whether the repo is volatile or not. If True, the repo will be created (cvmfs_server mkfs) with the -v flag.")] = True,
-    enable_garbage_collection: Annotated[bool, typer.Option(help="Whether to enable garbage collection for the repo.")] = True,
-    disable_auto_tag: Annotated[bool, typer.Option(help="Whether to disable auto-tagging for the repo.")] = True,
-    compression_algorithm: Annotated[str, typer.Option(help="Compression algorithm to use for the repo.")] = "none",
-    file_mbyte_limit: Annotated[int, typer.Option(help="Maximum file size in MiB that can be uploaded to the repo.")] = 4096,
+    volatile: Annotated[bool, typer.Option(help="Whether the repo is volatile or not. If True, the repo will be created (cvmfs_server mkfs) with the -v flag.")] = True, # CVMFS default: False
+    enable_garbage_collection: Annotated[bool, typer.Option(help="Whether to enable garbage collection for the repo.")] = True, # CVMFS default: False
+    disable_auto_tag: Annotated[bool, typer.Option(help="Whether to disable auto-tagging for the repo.")] = True, # CVMFS default: False
+    compression_algorithm: Annotated[str, typer.Option(help="Compression algorithm to use for the repo.")] = "none", # CVMFS default: zlib
+    file_mbyte_limit: Annotated[int, typer.Option(help="Maximum file size in MiB that can be uploaded to the repo.")] = 4096, # CVMFS default: 1024
+    repository_ttl_s: Annotated[int, typer.Option(help="Default polling period in seconds for the repo. Minimum 60. (CVMFS_REPOSITORY_TTL)")] = 60, # CVMFS default: 240
+    use_file_chunking: Annotated[bool, typer.Option(help="Whether to use file chunking for large files. (CVMFS_USE_FILE_CHUNKING)")] = True, # CVMFS default: True
+    # cvmfs default chunk config: https://github.com/cvmfs/cvmfs/blob/8693075ddd160534ae6aa0407df09aaa3360f5aa/cvmfs/swissknife_sync.h#L19-L21
+    min_file_chunk_size: Annotated[int, typer.Option(help="Minimum file chunk size in bytes. Only applicable if use_file_chunking is True. (CVMFS_MIN_CHUNK_SIZE)")] = 64*1024*1024, # CVMFS default: 4*1024*1024
+    avg_file_chunk_size: Annotated[int, typer.Option(help="Average file chunk size in bytes. Only applicable if use_file_chunking is True. (CVMFS_AVG_CHUNK_SIZE)")] = 128*1024*1024, # CVMFS default: 8*1024*1024
+    max_file_chunk_size: Annotated[int, typer.Option(help="Maximum file chunk size in bytes. Only applicable if use_file_chunking is True. (CVMFS_MAX_CHUNK_SIZE)")] = 256*1024*1024, # CVMFS default: 16*1024*1024
 ):
     """
     Initialize a CVMFS repo.
@@ -75,6 +81,11 @@ def init_cvmfs_repo(
     with open(repo_config_path, "a") as f:
         f.write("\n")
         f.write(f"CVMFS_FILE_MBYTE_LIMIT={file_mbyte_limit}\n")
+        f.write(f"CVMFS_REPOSITORY_TTL={repository_ttl_s}\n")
+        f.write(f"CVMFS_USE_FILE_CHUNKING={'true' if use_file_chunking else 'false'}\n")
+        f.write(f"CVMFS_MIN_CHUNK_SIZE={min_file_chunk_size}\n")
+        f.write(f"CVMFS_AVG_CHUNK_SIZE={avg_file_chunk_size}\n")
+        f.write(f"CVMFS_MAX_CHUNK_SIZE={max_file_chunk_size}\n")
 
     # Make the public key and certificate available via HTTP
     # Useful for clients and publishers:
