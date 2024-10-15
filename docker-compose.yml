@@ -26,7 +26,12 @@ services:
       - /var/spool/cvmfs
     
     cap_add:
-      - SYS_ADMIN
+      - SYS_ADMIN # required for fuse and ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
+      - DAC_OVERRIDE # required by ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
+      - DAC_READ_SEARCH # required by ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
+      - FOWNER # required by ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
+      - CHOWN # required by ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
+      - MKNOD # required by ducc: https://cernvm-forum.cern.ch/t/where-to-get-cvmfs-ducc-binary/366/2
     security_opt:
       - apparmor:unconfined
     devices:
