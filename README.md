@@ -84,6 +84,17 @@ cvmfs_server publish
 cvmfs_swissknife notify -p -u http://thor-slurm1.cluster.watonomous.ca:4929/api/v1 -r http://thor-slurm1.cluster.watonomous.ca:8080/cvmfs/cvmfs-server.example.local
 ```
 
+#### DUCC
+
+```bash
+python3 main.py init-cvmfs-repo cvmfs-server.example.local
+time cvmfs_ducc convert-single-image ghcr.io/watonomous/actions-runner-image:nightly cvmfs-server.example.local --skip-layers
+time cvmfs_ducc convert-single-image ghcr.io/watonomous/infra-config:master cvmfs-server.example.local --skip-layers
+```
+
+This is the step that downloads image layers:
+- https://github.com/cvmfs/cvmfs/blob/5c3777cf846cd2bb6e73d17af83384b37c2b6fa2/ducc/lib/conversion.go#L134
+
 
 ### Notifications
 

@@ -1,5 +1,29 @@
 # MARK: base
-FROM ubuntu:jammy-20240911.1@sha256:3d1556a8a18cf5307b121e0a98e93f1ddf1f3f8e092f1fddfd941254785b95d7 as base
+FROM ubuntu:jammy-20240911.1@sha256:3d1556a8a18cf5307b121e0a98e93f1ddf1f3f8e092f1fddfd941254785b95d7 AS base
+
+# MARK: ducc
+# bookworm is the codename for Debian 12, which is the base for Ubuntu 22.04 (Jammy)
+FROM golang:1.23.2-bookworm@sha256:18d2f940cc20497f85466fdbe6c3d7a52ed2db1d5a1a49a4508ffeee2dff1463 AS ducc
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # Required for the setcap command
+        libcap2-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Inject a dummy sudo command to workaround the hardcoded sudo requirement in the build script. We are already running as root.
+RUN echo $'#!/bin/bash\nexec "$@"' > /usr/bin/sudo \
+    && chmod +x /usr/bin/sudo
+
+RUN mkdir cvmfs \
+    && cd cvmfs \
+    && git init \
+    && git remote add origin https://github.com/cvmfs/cvmfs.git \
+    && git fetch --depth 1 origin 73a1fc54940e18b612d8f49bf08835f305ebdcbd \
+    && git checkout FETCH_HEAD
+
+RUN cd cvmfs/ducc \
+    && make
 
 # MARK: courier
 # This stage is used to keep the cache valid across different systems (even when the file permissions change).
@@ -74,5 +98,6 @@ RUN python3 -m pip install -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 COPY --from=courier /server/src /app
 COPY --from=courier /server/rootfs /
+COPY --from=ducc /go/cvmfs/ducc/cvmfs_ducc /usr/bin/cvmfs_ducc
 
 WORKDIR /app
