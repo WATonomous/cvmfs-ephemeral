@@ -147,17 +147,6 @@ scheduler = BackgroundScheduler()
 fastapi_app = WATcloudFastAPI(logger=logger, lifespan=fastapi_lifespan)
 transaction_lock = Lock()
 
-def resign_whitelist():
-    """
-    Function to run the cvmfs_server resign command.
-    """
-    logger.info("Running cvmfs_server resign")
-    res = subprocess.run(["cvmfs_server", "resign"], check=True)
-    if res.returncode != 0:
-        logger.error(f"Failed to run cvmfs_server resign (exit code: {res.returncode})")
-    else:
-        logger.info("Successfully ran cvmfs_server resign")
-
 @fastapi_app.post("/repos/{repo_name}")
 async def upload(repo_name: str, file: UploadFile, overwrite: bool = False, ttl_s: int = DEFAULT_TTL_S):
     logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type}, ttl_s: {ttl_s}) to repo: {repo_name}")
@@ -438,6 +427,15 @@ def housekeeping():
 
     logger.info(f"Housekeeping completed. Took {housekeeping_end - housekeeping_start:.2f}s")
     return {"message": "Housekeeping completed", "housekeeping_time_s": housekeeping_end - housekeeping_start}
+
+@app.command()
+@fastapi_app.post("/resign")
+def resign_whitelist():
+    """
+    Function to run the cvmfs_server resign command.
+    """
+    logger.info("Running cvmfs_server resign")
+    subprocess.run(["cvmfs_server", "resign"], check=True)
 
 @app.command()
 def start_server(port: int = 81):
