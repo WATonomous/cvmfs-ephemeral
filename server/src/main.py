@@ -436,6 +436,7 @@ def resign_whitelist():
     """
     logger.info("Running cvmfs_server resign")
     subprocess.run(["cvmfs_server", "resign"], check=True)
+    return {"message": "cvmfs_server resign completed successfully"}
 
 @app.command()
 def start_server(port: int = 81):
