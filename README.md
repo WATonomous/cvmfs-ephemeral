@@ -12,7 +12,7 @@ Coming soon:
     - When using the custom FastAPI upload server, speeds reach over 400MiB/s easily. We'll adopt this approach.
 - [x] Garbage collection
 - [ ] Better documentation
-- [ ] Automatic [whitelist re-signing](https://cvmfs.readthedocs.io/en/stable/apx-security.html#signature-details)
+- [x] Automatic [whitelist re-signing](https://cvmfs.readthedocs.io/en/stable/apx-security.html#signature-details)
 
 ### Manual Testing
 
