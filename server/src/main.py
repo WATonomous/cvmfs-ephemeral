@@ -137,6 +137,8 @@ async def fastapi_lifespan(app: FastAPI):
         scheduler.start()
         # Run housekeeping every minute
         scheduler.add_job(housekeeping, CronTrigger.from_crontab("* * * * *"))
+        # Run resign_whitelist daily
+        scheduler.add_job(resign_whitelist, CronTrigger.from_crontab("0 0 * * *"))
         yield
     finally:
         scheduler.shutdown()
@@ -425,6 +427,16 @@ def housekeeping():
 
     logger.info(f"Housekeeping completed. Took {housekeeping_end - housekeeping_start:.2f}s")
     return {"message": "Housekeeping completed", "housekeeping_time_s": housekeeping_end - housekeeping_start}
+
+@app.command()
+@fastapi_app.post("/resign")
+def resign_whitelist():
+    """
+    Function to run the cvmfs_server resign command.
+    """
+    logger.info("Running cvmfs_server resign")
+    subprocess.run(["cvmfs_server", "resign"], check=True)
+    return {"message": "cvmfs_server resign completed successfully"}
 
 @app.command()
 def start_server(port: int = 81):
