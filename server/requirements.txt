@@ -3,4 +3,4 @@ python-slugify>=8.0.4,<9
 python-multipart>=0.0.12,<1
 uvicorn>=0.31.1,<1
 apscheduler>=3.10.4,<4
-docker-unpack @ git+https://github.com/WATonomous/docker-unpack.git@91450194c848a02d9c3379780f43814d4611946a
+docker-unpack @ git+https://github.com/WATonomous/docker-unpack.git@b0029eb6e1266831ad0e3ae663502eb77a2cc1ce
