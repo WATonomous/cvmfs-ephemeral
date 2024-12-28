@@ -22,6 +22,7 @@ Coming soon:
 docker compose run --service-ports cvmfs-server
 
 python3 main.py init-cvmfs-repo cvmfs-server.example.local
+python3 main.py start-server
 ```
 
 #### Client

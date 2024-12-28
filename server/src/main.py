@@ -20,13 +20,14 @@ from typing_extensions import Annotated
 from watcloud_utils.fastapi import FastAPI, WATcloudFastAPI
 from watcloud_utils.logging import logger, set_up_logging
 from watcloud_utils.typer import app
+from docker_unpack.cli import unpack as docker_unpack
 
 set_up_logging()
 
 TTL_FILENAME = "ttl.json"
 DEFAULT_TTL_S = 7200
 
-FILENAME_BLACKLIST = [TTL_FILENAME]
+PATH_BLACKLIST = [TTL_FILENAME]
 
 @app.command()
 def init_cvmfs_repo(
@@ -148,18 +149,24 @@ fastapi_app = WATcloudFastAPI(logger=logger, lifespan=fastapi_lifespan)
 transaction_lock = Lock()
 
 @fastapi_app.post("/repos/{repo_name}")
-async def upload(repo_name: str, file: UploadFile, overwrite: bool = False, ttl_s: int = DEFAULT_TTL_S):
+async def upload(
+    repo_name: str,
+    file: UploadFile,
+    unpack: bool = False,
+    overwrite: bool = False,
+    ttl_s: int = DEFAULT_TTL_S
+):
     logger.info(f"Uploading file: {file.filename} (content_type: {file.content_type}, ttl_s: {ttl_s}) to repo: {repo_name}")
 
-    if file.filename in FILENAME_BLACKLIST:
+    if file.filename in PATH_BLACKLIST:
         raise HTTPException(status_code=400, detail=f"Filename {file.filename} is not allowed")
 
     # check if repo exists
     if not Path(f"/cvmfs/{repo_name}").exists():
         raise HTTPException(status_code=404, detail=f"Repo {repo_name} does not exist")
 
-    file_path = Path(f"/cvmfs/{repo_name}/{file.filename}")
-    if not overwrite and file_path.exists():
+    dest = Path(f"/cvmfs/{repo_name}/{file.filename}")
+    if not overwrite and dest.exists():
         raise HTTPException(status_code=409, detail=f"File {file.filename} already exists")
 
     expires_at = time.time() + ttl_s
@@ -171,14 +178,22 @@ async def upload(repo_name: str, file: UploadFile, overwrite: bool = False, ttl_
 
         try:
             # Remove existing file
-            if file_path.exists():
-                file_path.unlink()
+            if dest.exists():
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
 
-            # Upload file
-            with file_path.open("wb") as f:
-                upload_start = time.perf_counter()
-                f.write(await file.read())
-                upload_end = time.perf_counter()
+            upload_start = time.perf_counter()
+
+            if unpack:
+                docker_unpack(file.file, dest)
+            else:
+                # Upload file
+                with dest.open("wb") as f:
+                    f.write(await file.read())
+
+            upload_end = time.perf_counter()
 
             # Update TTL
             ttl_obj = json.loads(ttl_path.read_text()) if ttl_path.exists() else {}
@@ -210,13 +225,12 @@ async def upload(repo_name: str, file: UploadFile, overwrite: bool = False, ttl_
         "publish_time_s": publish_end - publish_start,
     }
 
-
 @app.command()
 @fastapi_app.post("/repos/{repo_name}/{file_name}/ttl")
 async def update_ttl(repo_name: str, file_name: str, ttl_s: int):
     logger.info(f"Updating TTL for file: {file_name} in repo: {repo_name}")
 
-    if file_name in FILENAME_BLACKLIST:
+    if file_name in PATH_BLACKLIST:
         raise HTTPException(status_code=400, detail=f"Filename {file_name} is not allowed")
 
     file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
@@ -273,16 +287,16 @@ async def list_files(repo_name: str):
     return {"files": [file.name for file in repo_path.iterdir() if file.is_file()]}
 
 @app.command()
-@fastapi_app.delete("/repos/{repo_name}/{file_name}")
-async def delete_file(repo_name: str, file_name: str):
-    logger.info(f"Deleting file: {file_name} from repo: {repo_name}")
+@fastapi_app.delete("/repos/{repo_name}/{target_name}")
+async def delete(repo_name: str, target_name: str):
+    logger.info(f"Deleting target: `{target_name}` from repo: `{repo_name}`")
 
-    if file_name in FILENAME_BLACKLIST:
-        raise HTTPException(status_code=400, detail=f"Filename {file_name} is not allowed")
+    if target_name in PATH_BLACKLIST:
+        raise HTTPException(status_code=400, detail=f"Target `{target_name}` is not allowed")
 
-    file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File {file_name} does not exist in repo {repo_name}")
+    target_path = Path(f"/cvmfs/{repo_name}/{target_name}")
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {target_name} does not exist in repo {repo_name}")
 
     ttl_path = Path(f"/cvmfs/{repo_name}/{TTL_FILENAME}")
 
@@ -291,17 +305,20 @@ async def delete_file(repo_name: str, file_name: str):
         subprocess.run(["cvmfs_server", "transaction", repo_name], check=True)
 
         try:
-            # Remove file
-            file_path.unlink()
+            # Remove target
+            if target_path.is_dir():
+                shutil.rmtree(target_path)
+            else:
+                target_path.unlink()
 
             # Update TTL
             ttl_obj = json.loads(ttl_path.read_text())
-            del ttl_obj[file_name]
+            del ttl_obj[target_name]
             ttl_path.write_text(json.dumps(ttl_obj))
 
-            logger.info(f"Deleted file: {file_name} from repo: {repo_name}")
+            logger.info(f"Deleted file: {target_name} from repo: {repo_name}")
         except Exception as e:
-            logger.error(f"Failed to delete file: {file_name} from repo: {repo_name}")
+            logger.error(f"Failed to delete file: {target_name} from repo: {repo_name}")
             logger.exception(e)
             # abort transaction
             subprocess.run(["cvmfs_server", "abort", repo_name, "-f"], check=True)
@@ -311,7 +328,7 @@ async def delete_file(repo_name: str, file_name: str):
         subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
         notify(repo_name)
 
-    return {"filename": file_name}
+    return {"target_name": target_name}
 
 @app.command()
 @fastapi_app.post("/repos/{repo_name}/clean")
@@ -335,16 +352,19 @@ def clean(repo_name: str):
 
         try:
             ttl_obj = json.loads(ttl_path.read_text())
-            for file_name, ttl in ttl_obj.copy().items():
+            for target_name, ttl in ttl_obj.copy().items():
                 if ttl["expires_at"] < time.time():
-                    file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
-                    if file_path.exists():
-                        file_path.unlink()
+                    target_path = Path(f"/cvmfs/{repo_name}/{target_name}")
+                    if target_path.exists():
+                        if target_path.is_dir():
+                            shutil.rmtree(target_path)
+                        else:
+                            target_path.unlink()
                         cleaned += 1
                     else:
-                        logger.warning(f"Trying to clean up non-existent file: {file_name} in repo: {repo_name}")
+                        logger.warning(f"Trying to clean up non-existent target: `{target_name}` in repo: `{repo_name}`")
                         errors += 1
-                    del ttl_obj[file_name]
+                    del ttl_obj[target_name]
 
             ttl_path.write_text(json.dumps(ttl_obj))
 
