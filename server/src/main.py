@@ -149,7 +149,7 @@ fastapi_app = WATcloudFastAPI(logger=logger, lifespan=fastapi_lifespan)
 transaction_lock = Lock()
 
 @fastapi_app.post("/repos/{repo_name}")
-async def upload(
+def upload(
     repo_name: str,
     file: UploadFile,
     unpack: bool = False,
@@ -191,7 +191,7 @@ async def upload(
             else:
                 # Upload file
                 with dest.open("wb") as f:
-                    f.write(await file.read())
+                    f.write(file.file.read())
 
             upload_end = time.perf_counter()
 
@@ -227,7 +227,7 @@ async def upload(
 
 @app.command()
 @fastapi_app.post("/repos/{repo_name}/{file_name}/ttl")
-async def update_ttl(repo_name: str, file_name: str, ttl_s: int):
+def update_ttl(repo_name: str, file_name: str, ttl_s: int):
     logger.info(f"Updating TTL for file: {file_name} in repo: {repo_name}")
 
     if file_name in PATH_BLACKLIST:
@@ -266,7 +266,7 @@ async def update_ttl(repo_name: str, file_name: str, ttl_s: int):
 
 @app.command()
 @fastapi_app.get("/repos/{repo_name}/{file_name}")
-async def download(repo_name: str, file_name: str):
+def download(repo_name: str, file_name: str):
     logger.info(f"Downloading file: {file_name} from repo: {repo_name}")
 
     file_path = Path(f"/cvmfs/{repo_name}/{file_name}")
@@ -277,7 +277,7 @@ async def download(repo_name: str, file_name: str):
 
 @app.command()
 @fastapi_app.get("/repos/{repo_name}")
-async def list_files(repo_name: str):
+def list_files(repo_name: str):
     logger.info(f"Listing files in repo: {repo_name}")
 
     repo_path = Path(f"/cvmfs/{repo_name}")
@@ -288,7 +288,7 @@ async def list_files(repo_name: str):
 
 @app.command()
 @fastapi_app.delete("/repos/{repo_name}/{target_name}")
-async def delete(repo_name: str, target_name: str):
+def delete(repo_name: str, target_name: str):
     logger.info(f"Deleting target: `{target_name}` from repo: `{repo_name}`")
 
     if target_name in PATH_BLACKLIST:
