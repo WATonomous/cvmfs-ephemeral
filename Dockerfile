@@ -27,10 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Add CVMFS repository
 RUN cd /tmp \
-    && wget --no-verbose --no-check-certificate https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_4.3-1_all.deb \
-    && echo "7fa925c8a7d312c486fac6acb4ceff546dec235f83f0de4c836cab8a09842279 cvmfs-release_4.3-1_all.deb" | sha256sum -c \
-    && dpkg -i cvmfs-release_4.3-1_all.deb \
-    && rm cvmfs-release_4.3-1_all.deb
+    && wget --no-verbose --no-check-certificate https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_4.6-1_all.deb \
+    && echo "a835b4a74f5b4858929a7ac8cd17eccf89a4d7eb66b40e1a870ae57328b56f75 cvmfs-release_4.6-1_all.deb" | sha256sum -c \
+    && dpkg -i cvmfs-release_4.6-1_all.deb \
+    && rm cvmfs-release_4.6-1_all.deb
 
 # Install CVMFS and support tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
