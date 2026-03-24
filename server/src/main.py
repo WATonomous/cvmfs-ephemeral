@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import shutil
 import string
@@ -26,8 +27,74 @@ set_up_logging()
 
 TTL_FILENAME = "ttl.json"
 DEFAULT_TTL_S = 7200
+# Maximum total size of user-uploaded content per repo, in bytes.
+# Set via MAX_REPO_SIZE_BYTES env var. 0 means no limit.
+MAX_REPO_SIZE_BYTES = int(os.environ.get("MAX_REPO_SIZE_BYTES", "0"))
 
 PATH_BLACKLIST = [TTL_FILENAME]
+
+
+def get_target_size(path: Path) -> int:
+    """Get the total size of a file or directory in bytes."""
+    if path.is_file():
+        return path.stat().st_size
+    total = 0
+    for f in path.rglob("*"):
+        if f.is_file():
+            total += f.stat().st_size
+    return total
+
+
+def evict_to_fit(repo_name: str, max_size: int):
+    """
+    Evict the oldest files (by expires_at) until the total size of
+    user-uploaded content is within max_size. Must be called within
+    a CVMFS transaction.
+    """
+    repo_path = Path(f"/cvmfs/{repo_name}")
+    ttl_path = repo_path / TTL_FILENAME
+
+    if not ttl_path.exists():
+        return 0
+
+    ttl_obj = json.loads(ttl_path.read_text())
+
+    # Calculate sizes for each tracked file
+    file_sizes = {}
+    total_size = 0
+    for target_name in ttl_obj:
+        target_path = repo_path / target_name
+        if target_path.exists():
+            size = get_target_size(target_path)
+            file_sizes[target_name] = size
+            total_size += size
+
+    if total_size <= max_size:
+        return 0
+
+    # Sort by expires_at ascending (evict soonest-to-expire first)
+    sorted_targets = sorted(ttl_obj.keys(), key=lambda t: ttl_obj[t]["expires_at"])
+
+    evicted = 0
+    for target_name in sorted_targets:
+        if total_size <= max_size:
+            break
+
+        target_path = repo_path / target_name
+        if target_path.exists():
+            size = file_sizes.get(target_name, 0)
+            if target_path.is_dir():
+                shutil.rmtree(target_path)
+            else:
+                target_path.unlink()
+            total_size -= size
+            evicted += 1
+            logger.info(f"Evicted `{target_name}` ({size / 1024 / 1024:.1f} MiB) from repo `{repo_name}` to stay within size limit")
+
+        del ttl_obj[target_name]
+
+    ttl_path.write_text(json.dumps(ttl_obj))
+    return evicted
 
 @app.command()
 def init_cvmfs_repo(
@@ -201,6 +268,12 @@ def upload(
             ttl_path.write_text(json.dumps(ttl_obj))
 
             logger.info(f"Uploaded file: {file.filename} (content_type: {file.content_type}). Took {upload_end - upload_start:.2f}s")
+
+            # Evict oldest files if repo exceeds size limit
+            if MAX_REPO_SIZE_BYTES > 0:
+                evicted = evict_to_fit(repo_name, MAX_REPO_SIZE_BYTES)
+                if evicted > 0:
+                    logger.info(f"Evicted {evicted} file(s) from repo `{repo_name}` to stay within {MAX_REPO_SIZE_BYTES / 1024 / 1024 / 1024:.1f} GiB limit")
         except Exception as e:
             logger.error(f"Failed to upload file: {file.filename} (content_type: {file.content_type})")
             logger.exception(e)
