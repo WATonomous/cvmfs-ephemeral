@@ -417,6 +417,7 @@ def clean(repo_name: str):
         return {"message": "No TTL file found. Skipping clean up."}
 
     cleaned = 0
+    orphans_cleaned = 0
     errors = 0
 
     with transaction_lock:
@@ -425,6 +426,8 @@ def clean(repo_name: str):
 
         try:
             ttl_obj = json.loads(ttl_path.read_text())
+
+            # Clean up expired entries tracked in ttl.json
             for target_name, ttl in ttl_obj.copy().items():
                 if ttl["expires_at"] < time.time():
                     target_path = Path(f"/cvmfs/{repo_name}/{target_name}")
@@ -438,6 +441,23 @@ def clean(repo_name: str):
                         logger.warning(f"Trying to clean up non-existent target: `{target_name}` in repo: `{repo_name}`")
                         errors += 1
                     del ttl_obj[target_name]
+
+            # Clean up orphaned entries (on disk but not in ttl.json).
+            # These can accumulate if ttl.json is reset (e.g. after a pod
+            # restart) while the CVMFS catalog still contains old directories.
+            repo_path = Path(f"/cvmfs/{repo_name}")
+            for entry in repo_path.iterdir():
+                if entry.name in PATH_BLACKLIST:
+                    continue
+                if entry.name.startswith("."):
+                    continue
+                if entry.name not in ttl_obj:
+                    logger.info(f"Removing orphaned entry `{entry.name}` from repo `{repo_name}` (not tracked in {TTL_FILENAME})")
+                    if entry.is_dir():
+                        shutil.rmtree(entry)
+                    else:
+                        entry.unlink()
+                    orphans_cleaned += 1
 
             ttl_path.write_text(json.dumps(ttl_obj))
 
@@ -453,7 +473,7 @@ def clean(repo_name: str):
         subprocess.run(["cvmfs_server", "publish", repo_name], check=True)
         notify(repo_name)
 
-    msg = f"Cleaned up {cleaned} expired files in repo: {repo_name}. Errors: {errors}"
+    msg = f"Cleaned up {cleaned} expired files and {orphans_cleaned} orphaned entries in repo: {repo_name}. Errors: {errors}"
     logger.info(msg)
 
     return {"message": msg}
